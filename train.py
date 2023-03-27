@@ -251,7 +251,7 @@ def main(argv):
         saver = tf.compat.v1.train.Checkpoint(optimizer=optimizer, encoder=model.encoder.net, decoder=model.decoder.net,
                                               optimizer_step=tf.compat.v1.train.get_or_create_global_step())
 
-    summary_writer = tf.contrib.summary.create_file_writer(outdir, flush_millis=10000)
+    summary_writer = tf.summary.create_file_writer(outdir, flush_millis=10000)
 
     if FLAGS.num_steps == 0:
         num_steps = FLAGS.num_epochs * len(x_train_miss) // FLAGS.batch_size
@@ -270,7 +270,7 @@ def main(argv):
     losses_val = []
 
     t0 = time.time()
-    with summary_writer.as_default(), tf.contrib.summary.always_record_summaries():
+    with summary_writer.as_default(), tf.summary.record_if(lambda: True):
         for i, (x_seq, m_seq) in enumerate(tf_x_train_miss.take(num_steps)):
             try:
                 with tf.GradientTape() as tape:
@@ -292,9 +292,9 @@ def main(argv):
                     print("Train loss = {:.3f} | NLL = {:.3f} | KL = {:.3f}".format(loss, nll, kl))
 
                     saver.save(checkpoint_prefix)
-                    tf.contrib.summary.scalar("loss_train", loss)
-                    tf.contrib.summary.scalar("kl_train", kl)
-                    tf.contrib.summary.scalar("nll_train", nll)
+                    tf.summary.scalar("loss_train", loss, step=i)
+                    tf.summary.scalar("kl_train", kl, step=i)
+                    tf.summary.scalar("nll_train", nll, step=i)
 
                     # Validation loss
                     x_val_batch, m_val_batch = tf_x_val_miss.get_next()
@@ -302,15 +302,15 @@ def main(argv):
                     losses_val.append(val_loss.numpy())
                     print("Validation loss = {:.3f} | NLL = {:.3f} | KL = {:.3f}".format(val_loss, val_nll, val_kl))
 
-                    tf.contrib.summary.scalar("loss_val", val_loss)
-                    tf.contrib.summary.scalar("kl_val", val_kl)
-                    tf.contrib.summary.scalar("nll_val", val_nll)
+                    tf.summary.scalar("loss_val", val_loss, step=i)
+                    tf.summary.scalar("kl_val", val_kl, step=i)
+                    tf.summary.scalar("nll_val", val_nll, step=i)
 
                     if FLAGS.data_type in ["hmnist", "sprites"]:
                         # Draw reconstructed images
                         x_hat = model.decode(model.encode(x_seq).sample()).mean()
-                        tf.contrib.summary.image("input_train", tf.reshape(x_seq, [-1]+list(img_shape)))
-                        tf.contrib.summary.image("reconstruction_train", tf.reshape(x_hat, [-1]+list(img_shape)))
+                        tf.summary.image("input_train", tf.reshape(x_seq, [-1]+list(img_shape)))
+                        tf.summary.image("reconstruction_train", tf.reshape(x_hat, [-1]+list(img_shape)))
                     elif FLAGS.data_type == 'physionet':
                         # Eval MSE and AUROC on entire val set
                         x_val_miss_batches = np.array_split(x_val_miss, FLAGS.batch_size, axis=0)
